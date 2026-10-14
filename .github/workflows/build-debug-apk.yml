@@ -86,5 +86,19 @@ jobs:
           set -euo pipefail
           APK=$(find "${GITHUB_WORKSPACE}/${{ env.GRADLE_MODULE }}/build/outputs/apk" -name "*-debug.apk" | head -n1 || true)
 
-          if [ -z "$APK" ]; then](#)
-
+          if [ -z "$APK" ]; then
+            echo "Debug APK not found in expected outputs. Listing directory for debug artifacts:"
+            find "${GITHUB_WORKSPACE}/${{ env.GRADLE_MODULE }}/build/outputs" -maxdepth 4 -type f -print || true
+            exit 1
+          fi
+
+          mkdir -p output
+          cp "$APK" output/app-debug.apk
+          echo "Debug APK copied to output/app-debug.apk"
+          ls -lah output
+
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: output/app-debug.apk
