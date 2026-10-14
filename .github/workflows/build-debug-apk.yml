@@ -42,19 +42,34 @@ jobs:
           set -euo pipefail
           SDK_ROOT="${ANDROID_SDK_ROOT}"
           mkdir -p "$SDK_ROOT/cmdline-tools"
-          curl -sSLo cmdline-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-latest.zip"
+
+          echo "Downloading Android command line tools..."
+          curl -fsSL -o cmdline-tools.zip "https://dl.google.com/android/repository/commandlinetools-linux-latest.zip"
+          if [ ! -s cmdline-tools.zip ]; then
+            echo "Download failed or file is empty; aborting."
+            exit 1
+          fi
+
           unzip -q cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
-          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest" || true
+
+          if [ -d "$SDK_ROOT/cmdline-tools/cmdline-tools" ]; then
+            mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+          elif [ ! -d "$SDK_ROOT/cmdline-tools/latest" ]; then
+            TOOLS_DIR=$(find "$SDK_ROOT/cmdline-tools" -maxdepth 2 -type d -name "cmdline-tools" | head -n1 || true)
+            if [ -n "$TOOLS_DIR" ]; then
+              mv "$TOOLS_DIR" "$SDK_ROOT/cmdline-tools/latest"
+            fi
+          fi
 
           export PATH="$SDK_ROOT/cmdline-tools/latest/bin:$SDK_ROOT/platform-tools:$PATH"
-
-          yes | sdkmanager --sdk_root="$SDK_ROOT" --licenses
-          sdkmanager --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}"
 
           echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_HOME=$SDK_ROOT" >> $GITHUB_ENV
           echo "$SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$SDK_ROOT/platform-tools" >> $GITHUB_PATH
+
+          yes | sdkmanager --sdk_root="$SDK_ROOT" --licenses
+          sdkmanager --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${BUILD_TOOLS}" "ndk;${NDK_VERSION}"
 
       - name: Show Java & Gradle info
         run: |
@@ -70,11 +85,13 @@ jobs:
         run: |
           set -euo pipefail
           APK=$(find "${GITHUB_WORKSPACE}/${{ env.GRADLE_MODULE }}/build/outputs/apk" -name "*-debug.apk" | head -n1 || true)
+
           if [ -z "$APK" ]; then
             echo "Debug APK not found in expected outputs. Listing directory for debug artifacts:"
-            find "${GITHUB_WORKSPACE}/${{ env.GRADLE_MODULE }}/build/outputs" -maxdepth 3 -type f -print || true
+            find "${GITHUB_WORKSPACE}/${{ env.GRADLE_MODULE }}/build/outputs" -maxdepth 4 -type f -print || true
             exit 1
           fi
+
           mkdir -p output
           cp "$APK" output/app-debug.apk
           echo "Debug APK copied to output/app-debug.apk"
