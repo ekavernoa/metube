@@ -53,7 +53,7 @@ jobs:
         with:
           name: lint-report
           path: '**/build/reports/lint-results-*.html'
-          if-no-files-found: warn
+          #if-no-files-found: warn
 
       - name: Build with Gradle
         run: ./gradlew clean assembleStbetaRelease
